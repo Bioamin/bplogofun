@@ -36,6 +36,21 @@ def weighted_dist(data):
         data_dict[x] += 1
     return data_dict
 
+def rtp_binary(data, point, keys_sorted):
+    low = 0
+    high = len(keys_sorted)
+    part = 0
+    total = sum(data.values())
+    while (low != high):
+        mid = int((low + high) / 2)
+        if (keys_sorted[mid] <= point):
+            low = mid + 1
+        else:
+            high = mid
+    for y in range(low, len(keys_sorted)):
+        part += data[keys_sorted[y]]
+    return part / total
+
 def rtp(data, point):
     part = 0
     total = sum(data.values())
@@ -395,8 +410,10 @@ def main():
 
         if (args.p):
             bpinfodist = weighted_dist(bpinfodata)
+            bpinfodist_sortedKeys = sorted(bpinfodist.keys())
         if (args.P):
             bpheightdist = weighted_dist(bpheightdata)
+            bpheightdist_sortedKeys = sorted(bpheightdist.keys())
 
         if (args.single):
             siteinfodata = []
@@ -432,8 +449,10 @@ def main():
                                 siteheightdata.append(((pheightclass[aa_class] / pheight) * info_int))
             if (args.p):
                 siteinfodist = weighted_dist(siteinfodata)
+                siteinfodist_sortedKeys = sorted(siteinfodist.keys())
             if (args.P):
                 siteheightdist = weighted_dist(siteheightdata)
+                siteheightdist_sortedKeys = sorted(siteheightdist)
     
     #Compute information stats
     print("Computing information statistics", file = sys.stderr)
@@ -459,7 +478,8 @@ def main():
                     info[bp][pairtype] = expected_bg_entropy - fg_entropy
                 
                 if (args.p):
-                    pv = rtp(bpinfodist, info[bp][pairtype])
+                    #def rtp_binary(data, point, keys_sorted):
+                    pv = rtp_binary(bpinfodist, info[bp][pairtype], bpinfodist_sortedKeys)
                     pvalsp[bp][pairtype] = pv
 
                 height = 0
@@ -471,7 +491,7 @@ def main():
                     height_dict[bp][pairtype][aa_class[0]] /= height
     
                     if (args.P):
-                        pv = rtp(bpheightdist, height_dict[bp][pairtype][aa_class[0]] * info[bp][pairtype])
+                        pv = rtp_binary(bpheightdist, height_dict[bp][pairtype][aa_class[0]] * info[bp][pairtype], bpheightdist_sortedKeys)
                         pvalsP[bp][pairtype][aa_class[0]] = pv
 
     if (args.single):
@@ -495,7 +515,8 @@ def main():
                     site_info[i][state] = expected_bg_entropy - fg_entropy
 
                 if (args.p):
-                    pv = rtp(siteinfodist, site_info[i][state])
+                    #def rtp_binary(data, point, keys_sorted):
+                    pv = rtp_binary(siteinfodist, site_info[i][state], siteinfodist_sortedKeys)
                     pvalsp[i][state] = pv
 
                 height = 0
@@ -506,7 +527,7 @@ def main():
                 for aa_class in sorted(site_height_dict[i][state].iteritems(), key = itemgetter(1), reverse = True):
                     site_height_dict[i][state][aa_class[0]] /= height
                     if (args.P):
-                        pv = rtp(bpheightdist, site_height_dict[i][state][aa_class[0]] * site_info[i][state])
+                        pv = rtp_binary(siteheightdist, site_height_dict[i][state][aa_class[0]] * site_info[i][state], siteheightdist_sortedKeys)
                         pvalsP[i][state][aa_class[0]] = pv
 
     if (permute):
