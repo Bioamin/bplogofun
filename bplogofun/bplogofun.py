@@ -16,7 +16,7 @@ import time
 import pkgutil
 
 def approx_expect2(H, k, N):
-    return (H - ((22-1)/((mt.log(4)) * N)))
+    return (H - ((k-1)/((mt.log(4)) * N)))
 
 def permuted(items, pieces = 2):
     sublists = [[] for i in range(pieces)]
@@ -60,9 +60,8 @@ def rtp(data, point):
     return part / total
 
 def approx_expect(H, k, N):
-    es = (22.0-1)/(2*N)
+    es = (k-1)/(2*N)
     es *= mt.log(mt.exp(1),2)
-    es += (1/N**2)
     return H - es
 
 #logo_output(site_info, site_height_dict, adjusted_pvals[multipletesting[0]])
@@ -387,7 +386,7 @@ def main():
                         if (total <= args.max):
                             expected_bg_entropy = exact_list[total - 1]
                         else:
-                            expected_bg_entropy = approx_expect(bg_entropy, numpositives, total)
+                            expected_bg_entropy = approx_expect(bg_entropy, numclasses, total)
 
                         if ((expected_bg_entropy - fg_entropy) < 0):
                             info_int = 0.0
@@ -429,7 +428,7 @@ def main():
                         if (total <= args.max):
                             expected_bg_entropy = exact_list[total - 1]
                         else:
-                            expected_bg_entropy = approx_expect(bg_entropy, numpositives, total)
+                            expected_bg_entropy = approx_expect(bg_entropy, numclasses, total)
                         
                         if ((expected_bg_entropy - fg_entropy) < 0):
                             info_int = 0
@@ -437,7 +436,7 @@ def main():
                             info_int = expected_bg_entropy - fg_entropy
 
                         if (args.p):
-                            siteinfodata.append(info)
+                            siteinfodata.append(info_int)
 
                         if (args.P):
                             pheightclass = {}
@@ -452,7 +451,7 @@ def main():
                 siteinfodist_sortedKeys = sorted(siteinfodist.keys())
             if (args.P):
                 siteheightdist = weighted_dist(siteheightdata)
-                siteheightdist_sortedKeys = sorted(siteheightdist)
+                siteheightdist_sortedKeys = sorted(siteheightdist.keys())
     
     #Compute information stats
     print("Computing information statistics", file = sys.stderr)
@@ -470,7 +469,7 @@ def main():
                 if (total <= args.max):
                     expected_bg_entropy = exact_list[total - 1]
                 else:
-                    expected_bg_entropy = approx_expect(bg_entropy, numpositives, total)
+                    expected_bg_entropy = approx_expect(bg_entropy, numclasses, total)
                 
                 if ((expected_bg_entropy - fg_entropy) < 0):
                     info[bp][pairtype] = 0
@@ -508,7 +507,7 @@ def main():
                 if (total <= args.max):
                     expected_bg_entropy = exact_list[total-1]
                 else:
-                    expected_bg_entropy = approx_expect(bg_entropy, numpositives, total)
+                    expected_bg_entropy = approx_expect(bg_entropy, numclasses, total)
                 if ((expected_bg_entropy - fg_entropy) < 0):
                     site_info[i][state] = 0.0
                 else:
@@ -613,7 +612,7 @@ def main():
         else:
             heading_dict['p'] = ""
         if (args.P):
-            Pstring = "\tclass:height"
+            Pstring = "\tclass:height:p-value"
             for m in multipletesting:
                 Pstring += ":{}".format(m)
             heading_dict['P'] = Pstring
@@ -643,6 +642,7 @@ def main():
                         for aainfo in sorted(height_dict[coord][pairtype].iteritems(), key = itemgetter(1), reverse = True):
                             output_string += " {}:{:05.3f}".format(aainfo[0], aainfo[1])
                             if (args.P):
+                                output_string += ":{:08.6f}".format(pvalsP[coord][pairtype][aainfo[0].upper()])
                                 for x in multipletesting:
                                     output_string += ":{:08.6f}".format(adjusted_pvals[x]['P'][coord][pairtype][aainfo[0].upper()])
 
@@ -663,6 +663,7 @@ def main():
                     for aainfo in sorted(site_height_dict[coord][base].iteritems(), key = itemgetter(1), reverse = True):
                         output_string += " {}:{:05.3f}".format(aainfo[0], aainfo[1])
                         if (args.P):
+                            output_string += ":{:08.6f}".format(pvalsP[coord][base][aainfo[0].upper()])
                             for x in multipletesting:
                                 output_string += ":{:08.6f}".format(adjusted_pvals[x]['P'][coord][base][aainfo[0].upper()])
 
