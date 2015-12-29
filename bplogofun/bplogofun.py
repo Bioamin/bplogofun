@@ -51,14 +51,6 @@ def rtp_binary(data, point, keys_sorted):
         part += data[keys_sorted[y]]
     return part / total
 
-def rtp(data, point):
-    part = 0
-    total = sum(data.values())
-    results = filter(lambda x: x >= point, data.keys())
-    for x in results:
-        part += data[x]
-    return part / total
-
 def approx_expect(H, k, N):
     es = (k-1)/(2*N)
     es *= mt.log(mt.exp(1),2)
@@ -69,9 +61,10 @@ def approx_expect(H, k, N):
 #               'D': ["10:25", "11:24", "12:23", "13:22"],
 #               'C': ["27:43", "28:42", "29:41", "30:40", "31:39", "32:38"],
 #               'T': ["49:65", "50:64", "51:63", "52:62", "53:61"]}
-def logo_output(site_info, site_height_dict, pvals, p, P, pair_to_sprinzl, coord_to_pair, file_prefix):
-    alpha = 0.05
+def logo_output(site_info, site_height_dict, pvals, p, P, pair_to_sprinzl,
+                coord_to_pair, file_prefix, alpha):
     coord_length = 0 #used to determine eps height
+    coord_length_addition = 0
 
     logo_outputDict = defaultdict(lambda : defaultdict(lambda : defaultdict(float)))
     for coord in range(1, len(site_info)+1):
@@ -84,7 +77,11 @@ def logo_output(site_info, site_height_dict, pvals, p, P, pair_to_sprinzl, coord
         for coord in sorted(logo_outputDict[base].iterkeys()):
             if (len(str(coord)) > coord_length):
                 coord_length = len(str(coord))
-            logodata += "numbering {{({}) makenumber}} if\ngsave\n".format(coord)
+            if (p and base in pvals['p'][coord] and pvals['p'][coord][base] <= 0.05):
+                logodata += "numbering {{(*{}) makenumber}} if\ngsave\n".format(coord)
+                coord_length_addition = 1
+            else:
+                logodata += "numbering {{({}) makenumber}} if\ngsave\n".format(coord)
             for aainfo in sorted(logo_outputDict[base][coord].iteritems(), key = itemgetter(1)):
                 if (aainfo[1] == 0):
                     continue
@@ -96,7 +93,7 @@ def logo_output(site_info, site_height_dict, pvals, p, P, pair_to_sprinzl, coord
                         if (bp_list.index(str(coord)) == 0):
                             sig = False
                             for pairs in filter(lambda k: k.startswith(base), pvals['P'][pair_to_sprinzl[bp]].keys()):
-                                if (aainfo[0].upper() in pvals['P'][pair_to_sprinzl[bp]][pairs] and pvals['P'][pair_to_sprinzl[bp]][pairs][aainfo[0]] <= alpha):
+                                if (aainfo[0].upper() in pvals['P'][pair_to_sprinzl[bp]][pairs] and pvals['P'][pair_to_sprinzl[bp]][pairs][aainfo[0]] <= alpha and aainfo[1] > 0.1):
                                     logodata += "/showingbox (s) def\n"
                                     logodata += "{:07.5f} ({}) numchar\n".format(aainfo[1], aainfo[0].upper())
                                     logodata += "/showingbox (n) def\n"
@@ -126,26 +123,27 @@ def logo_output(site_info, site_height_dict, pvals, p, P, pair_to_sprinzl, coord
         logo_template = template_byte.encode('utf-8')
         with open("{}_{}.eps".format(base, file_prefix), "w") as logo_output: 
             src = Template(logo_template)
-            logodata_dict = {'logo_data': logodata, 'low': min(logo_outputDict[base].keys()), 'high': max(logo_outputDict[base].keys()), 'length': 15.28 * max(logo_outputDict[base].keys()), 'height': 735-(5*coord_length)}
+            logodata_dict = {'logo_data': logodata, 'low': min(logo_outputDict[base].keys()), 'high': max(logo_outputDict[base].keys()), 'length': 15.28 * max(logo_outputDict[base].keys()), 'height': 735-(5*(coord_length + coord_length_addition))}
             logo_output.write(src.substitute(logodata_dict))
 
 def main():
     #Setup parser
     parser = argparse.ArgumentParser(description = "bpLogoFun")
-    group = parser.add_mutually_exclusive_group()
+    group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("-i", "--infernal", action="store_true")
     group.add_argument("-c", "--cove", action="store_true")
+    parser.add_argument("-a", "--alpha", type=float, default=0.05, help="Alpha value used for statistical tests. Default = 0.05")
     parser.add_argument('--max', '-x', help='max exact entropy', type=int, default=5)
-    parser.add_argument('--logo', help='Produce function logo ps files', action="store_true")
+    parser.add_argument('--logo', help='Produce function logo ps files. If permutation statistical options used the first test in multiple test correction list is used', action="store_true")
     parser.add_argument("-s", "--single", action="store_true")
     parser.add_argument("-p", help="Calculate permuation-based p-values for total information of CIFs",
                         action="store_true")
     parser.add_argument("-P",
                         help="calculate permutation-based p-values of individual CIF-class associations",
                         action="store_true")
-    parser.add_argument("-B", help="Number of permutations", type=int, default=100)
+    parser.add_argument("-B", help="Number of permutations. Default value is 100", type=int, default=100)
     parser.add_argument("-o", "--stdout", action="store_true", help="Print results to STDOUT")
-    parser.add_argument("-M", default="BY", help = "Specify method to correct p-values for multiple-comparisons. Current methods available: bonferroni, holm, hommel, BH, BY, and hochberg-simes. One or more can be specified separated by colons(:).")
+    parser.add_argument("-M", default="BY", help = "Specify method to correct p-values for multiple-comparisons. Current methods available: bonferroni, holm, hommel, BH, BY, and hochberg-simes. One or more can be specified separated by colons(:). Default is BY")
     parser.add_argument("-d", action="store_true", help="Output the alignment coordinates that correspond to each base-pair")
     parser.add_argument("struct", help="Structure File")
     parser.add_argument("file_preifx", help="File prefix")
@@ -533,7 +531,7 @@ def main():
         pvalsss = []
         adjusted_pvals = defaultdict(lambda: defaultdict(dict))
         print("Adjusting for multiple comparisons.", file=sys.stderr)
-        if (args.p and not arg.P):
+        if (args.p and not args.P):
             for x in sorted(pvalsp.keys()):
                 for y in sorted(pvalsp[x].items(), key=itemgetter(0)):
                     pvalsss.append(y[1])
@@ -655,7 +653,7 @@ def main():
                                                                          sitesum[coord][base],
                                                                          site_info[coord][base])
                     if (args.p):
-                        output_string += "{:08.6f}".format(pvalsp[coord][base])
+                        output_string += "\t{:08.6f}".format(pvalsp[coord][base])
                         for x in multipletesting:
                             output_string += "\t{}".format(adjusted_pvals[x]['p'][coord][base])
                     
@@ -688,6 +686,6 @@ def main():
 
         if (permute):
             logo_output(site_info, site_height_dict, adjusted_pvals[multipletesting[0]], args.p, args.P,
-                        pair_to_sprinzl, coord_to_pair, args.file_preifx)
+                        pair_to_sprinzl, coord_to_pair, args.file_preifx, args.alpha)
         else:
             logo_output(site_info, site_height_dict, {}, args.p, args.P, pair_to_sprinzl, coord_to_pair, args.file_preifx)
