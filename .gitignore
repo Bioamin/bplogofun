@@ -1,3 +1,6 @@
 .DS_Store
 .DS_Store?
 *.pyc
+build/
+dist/
+python_bplogofun.egg-info/
