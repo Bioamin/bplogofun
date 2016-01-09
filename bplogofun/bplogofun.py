@@ -4,6 +4,7 @@ from collections import defaultdict
 from operator import itemgetter
 from string import Template
 from copy import deepcopy
+from array import array
 import argparse
 import re
 import sys
@@ -14,9 +15,7 @@ import random
 import statsmodels.api
 import time
 import pkgutil
-
-def approx_expect2(H, k, N):
-    return (H - ((k-1)/((mt.log(4)) * N)))
+import bisect
 
 def permuted(items, pieces = 2):
     sublists = [[] for i in range(pieces)]
@@ -36,31 +35,55 @@ def weighted_dist(data):
         data_dict[x] += 1
     return data_dict
 
-def rtp_binary(data, point, keys_sorted):
-    low = 0
-    high = len(keys_sorted)
-    part = 0
-    total = sum(data.values())
-    while (low != high):
-        mid = int((low + high) / 2)
-        if (keys_sorted[mid] <= point):
-            low = mid + 1
+def rtp(data, point, keys_sorted):
+    if (point > 0):
+        part = 0
+        total = sum(data.values())
+        i = bisect.bisect_left(keys_sorted, point)
+        if (point <= keys_sorted[-1]):
+            for y in keys_sorted[i:]:
+                part += data[y]
+            return part / total
         else:
-            high = mid
-    for y in range(low, len(keys_sorted)):
-        part += data[keys_sorted[y]]
-    return part / total
+            return 0.0
+    else:
+        return 1.0
 
 def approx_expect(H, k, N):
     es = (k-1)/(2*N)
     es *= mt.log(mt.exp(1),2)
     return H - es
 
-#logo_output(site_info, site_height_dict, adjusted_pvals[multipletesting[0]])
 #    sprinzl = {'A': ["1:72", "2:71", "3:70", "4:69", "5:68", "6:67", "7:66"],
 #               'D': ["10:25", "11:24", "12:23", "13:22"],
 #               'C': ["27:43", "28:42", "29:41", "30:40", "31:39", "32:38"],
 #               'T': ["49:65", "50:64", "51:63", "52:62", "53:61"]}
+def bplogo_output(bpinfo, height_dict, bp_set, pvals, p, P, sprinzl, d, file_prefix, alpha):
+    coord_length = 0
+    coord_length_addition = 0
+    for bp in bp_set:
+        logodata = ""
+        for arm in ["A", "D", "C", "T"]:
+            for i, coord in enumerate(sprinzl[arm]):
+                if coord in bpinfo:
+                    logodata += "numbering {{({}) makenumber}} if\ngsave\n".format(coord)
+                    if (coord_length < len(coord)):
+                        coord_length = len(coord)
+                    for aainfo in sorted(height_dict[coord][bp].iteritems(), key = itemgetter(1)):
+                        if (bpinfo[coord][bp] * aainfo[1] <= 0):
+                            continue
+                        else:
+                            logodata += "{:07.5f} ({}) numchar\n".format(bpinfo[coord][bp] * aainfo[1], aainfo[0].upper())
+
+                    logodata += "grestore\nshift\n"
+        #output logodata to template
+        template_byte = pkgutil.get_data('bplogofun', 'eps/Template.eps')
+        logo_template = template_byte.encode('utf-8')
+        with open("{}_{}.eps".format(bp, file_prefix), "w") as logo_output: 
+            src = Template(logo_template)
+            logodata_dict = {'logo_data': logodata, 'low': 1, 'high': 76, 'length': 19.262 * len(bpinfo), 'height': 735-(5*(coord_length + coord_length_addition))}
+            logo_output.write(src.substitute(logodata_dict))
+
 def logo_output(site_info, site_height_dict, pvals, p, P, pair_to_sprinzl,
                 coord_to_pair, file_prefix, alpha):
     coord_length = 0 #used to determine eps height
@@ -270,6 +293,7 @@ def main():
     sitefreq = defaultdict(lambda : defaultdict(lambda : defaultdict(int)))
     aa_classes = []
     seqs = []
+    bp_set = set()
 
     for fn in glob.glob("{}_?.aln".format(args.file_preifx)):
         match = re.search("_([A-Z])\.aln", fn)
@@ -313,6 +337,7 @@ def main():
                     bp = sprinzl[arm][i]
                     pairtype = "{}{}".format(sequence[pair[0]].upper(),sequence[pair[1]].upper())
                     pairtype = pairtype.replace("T", "U")
+                    bp_set.add(pairtype)
                     summ[bp][pairtype] += 1
                     freq[bp][pairtype][aa_class] += 1
     
@@ -475,8 +500,7 @@ def main():
                     info[bp][pairtype] = expected_bg_entropy - fg_entropy
                 
                 if (args.p):
-                    #def rtp_binary(data, point, keys_sorted):
-                    pv = rtp_binary(bpinfodist, info[bp][pairtype], bpinfodist_sortedKeys)
+                    pv = rtp(bpinfodist, info[bp][pairtype], bpinfodist_sortedKeys)
                     pvalsp[bp][pairtype] = pv
 
                 height = 0
@@ -488,7 +512,7 @@ def main():
                     height_dict[bp][pairtype][aa_class[0]] /= height
     
                     if (args.P):
-                        pv = rtp_binary(bpheightdist, height_dict[bp][pairtype][aa_class[0]] * info[bp][pairtype], bpheightdist_sortedKeys)
+                        pv = rtp(bpheightdist, height_dict[bp][pairtype][aa_class[0]] * info[bp][pairtype], bpheightdist_sortedKeys)
                         pvalsP[bp][pairtype][aa_class[0]] = pv
 
     if (args.single):
@@ -512,8 +536,7 @@ def main():
                     site_info[i][state] = expected_bg_entropy - fg_entropy
 
                 if (args.p):
-                    #def rtp_binary(data, point, keys_sorted):
-                    pv = rtp_binary(siteinfodist, site_info[i][state], siteinfodist_sortedKeys)
+                    pv = rtp(siteinfodist, site_info[i][state], siteinfodist_sortedKeys)
                     pvalsp[i][state] = pv
 
                 height = 0
@@ -524,7 +547,7 @@ def main():
                 for aa_class in sorted(site_height_dict[i][state].iteritems(), key = itemgetter(1), reverse = True):
                     site_height_dict[i][state][aa_class[0]] /= height
                     if (args.P):
-                        pv = rtp_binary(siteheightdist, site_height_dict[i][state][aa_class[0]] * site_info[i][state], siteheightdist_sortedKeys)
+                        pv = rtp(siteheightdist, site_height_dict[i][state][aa_class[0]] * site_info[i][state], siteheightdist_sortedKeys)
                         pvalsP[i][state][aa_class[0]] = pv
 
     if (permute):
@@ -669,6 +692,8 @@ def main():
 
     if (args.logo):
         print("Producing logo graphics")
+        #def bplogo_output(bpinfo, height_dict, bp_set, pvals, p, P, sprinzl, d, file_prefix, alpha):
+        bplogo_output(info, height_dict, bp_set, adjusted_pvals[multipletesting[0]], args.p, args.P, sprinzl, args.d, args.file_preifx, args.alpha)
         #def logo_output(site_info, site_height_dict, pvals = {}, p = False, P = False):
         pair_to_sprinzl = {}
         coord_to_pair = {}
