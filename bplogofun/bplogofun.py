@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from __future__ import print_function
 from __future__ import division
 from collections import defaultdict
@@ -10,7 +12,7 @@ import re
 import sys
 import glob
 import math as mt
-import exact
+import bplogofun.exact
 import random
 import statsmodels.api
 import time
@@ -66,22 +68,73 @@ def bplogo_output(bpinfo, height_dict, bp_set, pvals, p, P, sprinzl, d, file_pre
         for arm in ["A", "D", "C", "T"]:
             for i, coord in enumerate(sprinzl[arm]):
                 if coord in bpinfo:
-                    logodata += "numbering {{({}) makenumber}} if\ngsave\n".format(coord)
                     if (coord_length < len(coord)):
                         coord_length = len(coord)
-                    for aainfo in sorted(height_dict[coord][bp].iteritems(), key = itemgetter(1)):
+                    if (p and bp in pvals['p'][coord] and pvals['p'][coord][bp] <= 0.05):
+                        logodata += "numbering {{(*{}) makenumber}} if\ngsave\n".format(coord)
+                        coord_length_addition = 1
+                    else:
+                        logodata += "numbering {{({}) makenumber}} if\ngsave\n".format(coord)
+                    for aainfo in sorted(height_dict[coord][bp].items(), key = itemgetter(1)):
                         if (bpinfo[coord][bp] * aainfo[1] <= 0):
                             continue
                         else:
-                            logodata += "{:07.5f} ({}) numchar\n".format(bpinfo[coord][bp] * aainfo[1], aainfo[0].upper())
+                            #pvalsP[bp][pairtype][aa_class[0]] = pv
+                            if (P and aainfo[0].upper() in pvals['P'][coord][bp] and pvals['P'][coord][bp][aainfo[0]] <= alpha):
+                                logodata += "/showingbox (s) def\n"
+                                logodata += "{:07.5f} ({}) numchar\n".format(bpinfo[coord][bp] * aainfo[1], aainfo[0].upper())
+                                logodata += "/showingbox (n) def\n"
+                            else:
+                                logodata += "{:07.5f} ({}) numchar\n".format(bpinfo[coord][bp] * aainfo[1], aainfo[0].upper())
 
                     logodata += "grestore\nshift\n"
         #output logodata to template
         template_byte = pkgutil.get_data('bplogofun', 'eps/Template.eps')
-        logo_template = template_byte.encode('utf-8')
+        logo_template = template_byte.decode('utf-8')
         with open("{}_{}.eps".format(bp, file_prefix), "w") as logo_output: 
             src = Template(logo_template)
             logodata_dict = {'logo_data': logodata, 'low': 1, 'high': 76, 'length': 19.262 * len(bpinfo), 'height': 735-(5*(coord_length + coord_length_addition))}
+            logo_output.write(src.substitute(logodata_dict))
+
+def slogo_output(site_info, site_height_dict, pvals, p, P, file_prefix, alpha):
+    coord_length = 0 #used to determine eps height
+    coord_length_addition = 0
+    logo_outputDict = defaultdict(lambda : defaultdict(lambda : defaultdict(float)))
+    for coord in range(1, len(site_info)+1):
+        for base, info in sorted(site_info[coord].items(), key = itemgetter(0)):
+            for aainfo in sorted(site_height_dict[coord][base].items(), key = itemgetter(1)):
+                logo_outputDict[base][coord][aainfo[0]] = info * aainfo[1]
+
+    for base in logo_outputDict:
+        logodata = ""
+        for coord in sorted(logo_outputDict[base]):
+            if (len(str(coord)) > coord_length):
+                coord_length = len(str(coord))
+            if (p and base in pvals['p'][coord] and pvals['p'][coord][base] <= alpha):
+                logodata += "numbering {{(*{}) makenumber}} if\ngsave\n".format(coord)
+                coord_length_addition = 1
+            else:
+                logodata += "numbering {{({}) makenumber}} if\ngsave\n".format(coord)
+            
+            for aainfo in sorted(logo_outputDict[base][coord].items(), key = itemgetter(1)):
+                if (aainfo[1] == 0):
+                    continue
+                #pvalsP[i][state][aa_class[0]]
+                if (P and aainfo[0] in pvals['P'][coord][base] and pvals['P'][coord][base][aainfo[0]] <= alpha):
+                    logodata += "/showingbox (s) def\n"
+                    logodata += "{:07.5f} ({}) numchar\n".format(aainfo[1], aainfo[0].upper())
+                    logodata += "/showingbox (n) def\n"
+                else:
+                    logodata += "{:07.5f} ({}) numchar\n".format(aainfo[1], aainfo[0].upper())
+            
+            logodata += "grestore\nshift\n"
+
+        #output logodata to template
+        template_byte = pkgutil.get_data('bplogofun', 'eps/Template.eps')
+        logo_template = template_byte.decode('utf-8')
+        with open("{}_{}.eps".format(base, file_prefix), "w") as logo_output: 
+            src = Template(logo_template)
+            logodata_dict = {'logo_data': logodata, 'low': min(logo_outputDict[base].keys()), 'high': max(logo_outputDict[base].keys()), 'length': 15.28 * max(logo_outputDict[base].keys()), 'height': 735-(5*(coord_length + coord_length_addition))}
             logo_output.write(src.substitute(logodata_dict))
 
 def logo_output(site_info, site_height_dict, pvals, p, P, pair_to_sprinzl,
@@ -100,7 +153,7 @@ def logo_output(site_info, site_height_dict, pvals, p, P, pair_to_sprinzl,
         for coord in sorted(logo_outputDict[base].iterkeys()):
             if (len(str(coord)) > coord_length):
                 coord_length = len(str(coord))
-            if (p and base in pvals['p'][coord] and pvals['p'][coord][base] <= 0.05):
+            if (p and base in pvals['p'][coord] and pvals['p'][coord][base] <= alpha):
                 logodata += "numbering {{(*{}) makenumber}} if\ngsave\n".format(coord)
                 coord_length_addition = 1
             else:
@@ -153,12 +206,12 @@ def main():
     #Setup parser
     parser = argparse.ArgumentParser(description = "bpLogoFun")
     group = parser.add_mutually_exclusive_group(required=True)
-    group.add_argument("-i", "--infernal", action="store_true")
-    group.add_argument("-c", "--cove", action="store_true")
+    group.add_argument("-i", "--infernal", action="store_true", help="Structure file is in infernal format")
+    group.add_argument("-c", "--cove", action="store_true", help="Structure file is in cove format")
     parser.add_argument("-a", "--alpha", type=float, default=0.05, help="Alpha value used for statistical tests. Default = 0.05")
-    parser.add_argument('--max', '-x', help='max exact entropy', type=int, default=5)
+    parser.add_argument('--max', '-x', help="Maximum sample size to calculate the exact entropy of. Default = 10", type=int, default=10)
     parser.add_argument('--logo', help='Produce function logo ps files. If permutation statistical options used the first test in multiple test correction list is used', action="store_true")
-    parser.add_argument("-s", "--single", action="store_true")
+    parser.add_argument("-s", "--single", action="store_true", help="Calculate information statistics for single sites in addition to base-pair information statistics.")
     parser.add_argument("-p", help="Calculate permuation-based p-values for total information of CIFs",
                         action="store_true")
     parser.add_argument("-P",
@@ -193,7 +246,7 @@ def main():
         pvalsP = defaultdict(lambda: defaultdict(lambda: defaultdict(float)))
         pvalsp = defaultdict(lambda: defaultdict(float))
         if (len(multipletesting) == 0):
-            multipletesting.append('fdr_bh')
+            multipletesting.append('fdr_by')
 
         num_permutations = args.B
         print("# Number of permutations for p-values: {}".format(num_permutations), file=sys.stderr)
@@ -325,7 +378,7 @@ def main():
                 elif (match and interleaved):
                     seq[match.group(1)] += match.group(2)
         length = 0
-        for sequence in seq.itervalues():
+        for sequence in seq.values():
             if (permute):
                 aa_classes.append(aa_class)
                 seqs.append(sequence)
@@ -357,6 +410,9 @@ def main():
         print("Generating permuted alignment data", file=sys.stderr)
         for p in range(num_permutations):
             indices.append(permuted(range(len(aa_classes))))
+            print("{} of {} permutation indices generated".format((p+1), num_permutations), end="\r")
+        seq_len = len(seqs)
+        print()
         for s, seq in enumerate(seqs):
             for arm in pairs:
                 for j, coords in enumerate(pairs[arm]):
@@ -370,16 +426,18 @@ def main():
                     char = char.upper()
                     state = char.replace("T", "U")
                     for p in range(num_permutations):
-                        psitefreq[p][pos+1][state][aa_classes[indices[p][s]]] += 1         
-
-        
+                        psitefreq[p][pos+1][state][aa_classes[indices[p][s]]] += 1
+            
+            print("{:05.2f}% of permutations completed".format(((s+1)/ seq_len) * 100), end='\r')
+        print()
+            
     print("Computing exact expected entropies", file = sys.stderr)
     
     p = [x/sum(size_dict.values()) for x in size_dict.values()] # Holds Background
     exact_list = []
     start_sample_sz =1
     for n in range(start_sample_sz, args.max + 1):
-        j = exact.calc_exact(n, p, numclasses)
+        j = bplogofun.exact.calc_exact(n, p, numclasses)
         exact_list.append(j[1])
         print("{:2} {:07.5f}".format(n, exact_list[n-1]), file=sys.stderr)
     
@@ -387,7 +445,7 @@ def main():
     bg_entropy = 0
     info = defaultdict(lambda : defaultdict(float))
     height_dict = defaultdict(lambda : defaultdict(lambda : defaultdict(float)))
-    for x in size_dict.itervalues():
+    for x in size_dict.values():
         if (x != 0):
             bg_entropy -= (x/size_int) * mt.log(x/size_int, 2)
     
@@ -404,7 +462,7 @@ def main():
                     for p in range(num_permutations):
                         numpositives = len(pfreq[p][bp][pairtype])
                         fg_entropy = 0
-                        for x in pfreq[p][bp][pairtype].itervalues():
+                        for x in pfreq[p][bp][pairtype].values():
                             fg_entropy -= (x/total)*mt.log(x/total,2)
                         if (total <= args.max):
                             expected_bg_entropy = exact_list[total - 1]
@@ -422,7 +480,7 @@ def main():
                         if (args.P):
                             pheightclass = {}
                             pheight = 0
-                            for aa_class in pfreq[p][bp][pairtype].iterkeys():
+                            for aa_class in pfreq[p][bp][pairtype]:
                                 pheightclass[aa_class] = ((pfreq[p][bp][pairtype][aa_class] / summ[bp][pairtype]) / (size_dict[aa_class] / size_int))
                                 pheight += pheightclass[aa_class]
                             
@@ -432,21 +490,22 @@ def main():
 
         if (args.p):
             bpinfodist = weighted_dist(bpinfodata)
-            bpinfodist_sortedKeys = sorted(bpinfodist.keys())
+            bpinfodist_sortedKeys = sorted(list(bpinfodist.keys()))
+
         if (args.P):
             bpheightdist = weighted_dist(bpheightdata)
-            bpheightdist_sortedKeys = sorted(bpheightdist.keys())
+            bpheightdist_sortedKeys = sorted(list(bpheightdist.keys()))
 
         if (args.single):
             siteinfodata = []
             siteheightdata = []
             for i in sorted(sitesum.keys()):
-                for state in sorted(sitesum[i].keys()):
+                for state in sorted(sitesum[i]):
                     total = sitesum[i][state]
                     for p in range(num_permutations):
                         numpositives = len(psitefreq[p][i][state])
                         fg_entropy = 0
-                        for x in psitefreq[p][i][state].itervalues():
+                        for x in psitefreq[p][i][state].values():
                             fg_entropy -= x/total * mt.log(x/total, 2)
                         if (total <= args.max):
                             expected_bg_entropy = exact_list[total - 1]
@@ -483,11 +542,11 @@ def main():
         for i, bp in enumerate(sprinzl[arm]):
             if (not i < len(pairs[arm])):
                 continue
-            for pairtype in sorted(summ[bp].keys()):
+            for pairtype in sorted(summ[bp]):
                 total = summ[bp][pairtype]
                 numpositives = len(freq[bp][pairtype])
                 fg_entropy = 0
-                for x in freq[bp][pairtype].itervalues():
+                for x in freq[bp][pairtype].values():
                     fg_entropy -= (x/total) * mt.log(x/total, 2)
                 if (total <= args.max):
                     expected_bg_entropy = exact_list[total - 1]
@@ -504,11 +563,11 @@ def main():
                     pvalsp[bp][pairtype] = pv
 
                 height = 0
-                for aa_class in freq[bp][pairtype].iterkeys():
+                for aa_class in freq[bp][pairtype]:
                     height_dict[bp][pairtype][aa_class] = ((freq[bp][pairtype][aa_class] / summ[bp][pairtype]) / (size_dict[aa_class] / size_int))
     
                     height += height_dict[bp][pairtype][aa_class]
-                for aa_class in sorted(height_dict[bp][pairtype].iteritems(), key = itemgetter(1), reverse = True):
+                for aa_class in sorted(height_dict[bp][pairtype].items(), key = itemgetter(1), reverse = True):
                     height_dict[bp][pairtype][aa_class[0]] /= height
     
                     if (args.P):
@@ -520,12 +579,12 @@ def main():
         site_height_dict = defaultdict(lambda : defaultdict(lambda : defaultdict(float)))
                    # sitesum[pos+1][state] += 1
                     #sitefreq[pos+1][state][aa_class] += 1
-        for i in sorted(sitesum.iterkeys()):
+        for i in sorted(sitesum):
             for state in sorted(sitesum[i]):
                 total = sitesum[i][state]
                 numpositives = len(sitefreq[i][state])
                 fg_entropy = 0
-                fg_entropy = -(sum(map(lambda x: (x/total) * mt.log(x/total,2), sitefreq[i][state].itervalues())))
+                fg_entropy = -(sum(map(lambda x: (x/total) * mt.log(x/total,2), sitefreq[i][state].values())))
                 if (total <= args.max):
                     expected_bg_entropy = exact_list[total-1]
                 else:
@@ -540,11 +599,11 @@ def main():
                     pvalsp[i][state] = pv
 
                 height = 0
-                for aa_class in sitefreq[i][state].iterkeys():
+                for aa_class in sitefreq[i][state]:
                     site_height_dict[i][state][aa_class] = ((sitefreq[i][state][aa_class] / sitesum[i][state]) / (size_dict[aa_class] / size_int))
                     height += site_height_dict[i][state][aa_class]
 
-                for aa_class in sorted(site_height_dict[i][state].iteritems(), key = itemgetter(1), reverse = True):
+                for aa_class in sorted(site_height_dict[i][state].items(), key = itemgetter(1), reverse = True):
                     site_height_dict[i][state][aa_class[0]] /= height
                     if (args.P):
                         pv = rtp(siteheightdist, site_height_dict[i][state][aa_class[0]] * site_info[i][state], siteheightdist_sortedKeys)
@@ -555,22 +614,22 @@ def main():
         adjusted_pvals = defaultdict(lambda: defaultdict(dict))
         print("Adjusting for multiple comparisons.", file=sys.stderr)
         if (args.p and not args.P):
-            for x in sorted(pvalsp.keys()):
+            for x in sorted(pvalsp, key = str):
                 for y in sorted(pvalsp[x].items(), key=itemgetter(0)):
                     pvalsss.append(y[1])
         elif (args.P and args.p):
             #add args.p first
-            for x in sorted(pvalsp.keys()):
+            for x in sorted(pvalsp, key = str):
                 for y in sorted(pvalsp[x].items(), key=itemgetter(0)):
                     pvalsss.append(y[1])
             #add args.P
-            for x in sorted(pvalsP.keys()):
-                for y in sorted(pvalsP[x].keys()):
+            for x in sorted(pvalsP, key = str):
+                for y in sorted(pvalsP[x]):
                     for z in sorted(pvalsP[x][y].items(), key=itemgetter(0)):
                         pvalsss.append(z[1])
         elif (args.P and not args.p):
-            for x in sorted(pvalsP.keys()):
-                for y in sorted(pvalsP[x].keys()):
+            for x in sorted(pvalsP, key = str):
+                for y in sorted(pvalsP[x]):
                     for z in sorted(pvalsP[x][y].items(), key=itemgetter(0)):
                         pvalsss.append(z[1])
         
@@ -578,49 +637,49 @@ def main():
             correctedp = statsmodels.api.stats.multipletests(pvalsss, method=mtest)
             correctedp = list(correctedp[1])
             if (args.p and not args.P):
-                for x in sorted(pvalsp.keys()):
-                    for y in sorted(pvalsp[x].keys()):
+                for x in sorted(pvalsp, key = str):
+                    for y in sorted(pvalsp[x]):
                         pvalsp[x][y] = correctedp.pop(0)
                 adjusted_pvals[mtest]['p'] = deepcopy(pvalsp)
             elif (args.P and args.p):
                 #process args.p first
-                for x in sorted(pvalsp.keys()):
-                    for y in sorted(pvalsp[x].keys()):
+                for x in sorted(pvalsp, key = str):
+                    for y in sorted(pvalsp[x]):
                         pvalsp[x][y] = correctedp.pop(0)
                 adjusted_pvals[mtest]['p'] = deepcopy(pvalsp)
                 #process args.P
-                for x in sorted(pvalsP.keys()):
-                    for y in sorted(pvalsP[x].keys()):
-                        for z in sorted(pvalsP[x][y].keys()):
+                for x in sorted(pvalsP, key = str):
+                    for y in sorted(pvalsP[x]):
+                        for z in sorted(pvalsP[x][y]):
                             pvalsP[x][y][z] = correctedp.pop(0)
                 adjusted_pvals[mtest]['P'] = deepcopy(pvalsP)
             elif (args.P and not args.p):
-                for x in sorted(pvalsP.keys()):
-                    for y in sorted(pvalsP[x].keys()):
-                        for z in sorted(pvalsP[x][y].keys()):
+                for x in sorted(pvalsP, key = str):
+                    for y in sorted(pvalsP[x]):
+                        for z in sorted(pvalsP[x][y]):
                             pvalsP[x][y][z] = correctedp.pop(0)
                 adjusted_pvals[mtest]['P'] = deepcopy(pvalsP)
 
     if (args.stdout):
         #restoring original p-values for output
         if (args.p and not args.P):
-            for x in sorted(pvalsp.keys()):
-                for y in sorted(pvalsp[x].keys()):
+            for x in sorted(pvalsp, key = str):
+                for y in sorted(pvalsp[x]):
                     pvalsp[x][y] = pvalsss.pop(0)
         elif (args.P and args.p):
             #process args.p first
-            for x in sorted(pvalsp.keys()):
-                for y in sorted(pvalsp[x].keys()):
+            for x in sorted(pvalsp, key = str):
+                for y in sorted(pvalsp[x]):
                     pvalsp[x][y] = pvalsss.pop(0)
             #process args.P
-            for x in sorted(pvalsP.keys()):
-                for y in sorted(pvalsP[x].keys()):
-                    for z in sorted(pvalsP[x][y].keys()):
+            for x in sorted(pvalsP, key = str):
+                for y in sorted(pvalsP[x]):
+                    for z in sorted(pvalsP[x][y]):
                         pvalsP[x][y][z] = pvalsss.pop(0)
         elif (args.P and not args.p):
-            for x in sorted(pvalsP.keys()):
-                for y in sorted(pvalsP[x].keys()):
-                    for z in sorted(pvalsP[x][y].keys()):
+            for x in sorted(pvalsP, key = str):
+                for y in sorted(pvalsP[x]):
+                    for z in sorted(pvalsP[x][y]):
                         pvalsP[x][y][z] = pvalsss.pop(0)
         
         #build output heading
@@ -648,7 +707,7 @@ def main():
         for arm in ["A", "D", "C", "T"]:
             for i, coord in enumerate(sprinzl[arm]):
                 if coord in info:
-                    for pairtype in sorted(info[coord].iterkeys()):
+                    for pairtype in sorted(info[coord]):
                         output_string = "bp:\t{}\t{}".format(arm, coord)
                         if (args.d):
                             output_string += "\t{}".format(":".join([str(pairs[arm][i][0]+1),str(pairs[arm][i][1]+1)]))
@@ -660,7 +719,7 @@ def main():
                                 output_string += "\t{:08.6f}".format(adjusted_pvals[x]['p'][coord][pairtype])
                                 
                         output_string += "\t"
-                        for aainfo in sorted(height_dict[coord][pairtype].iteritems(), key = itemgetter(1), reverse = True):
+                        for aainfo in sorted(height_dict[coord][pairtype].items(), key = itemgetter(1), reverse = True):
                             output_string += " {}:{:05.3f}".format(aainfo[0], aainfo[1])
                             if (args.P):
                                 output_string += ":{:08.6f}".format(pvalsP[coord][pairtype][aainfo[0].upper()])
@@ -671,7 +730,7 @@ def main():
         if (args.single):
             print("#ss\t\tcoord\tf\tN\tinfo{p}{P}".format(**heading_dict))
             for coord in range(1, len(site_info)+1):
-                for base in sorted(site_info[coord].iterkeys()):
+                for base in sorted(site_info[coord]):
                     output_string = "ss:\t\t{}\t{}\t{}\t{:05.3f}".format(coord, base,
                                                                          sitesum[coord][base],
                                                                          site_info[coord][base])
@@ -681,7 +740,7 @@ def main():
                             output_string += "\t{}".format(adjusted_pvals[x]['p'][coord][base])
                     
                     output_string += "\t"
-                    for aainfo in sorted(site_height_dict[coord][base].iteritems(), key = itemgetter(1), reverse = True):
+                    for aainfo in sorted(site_height_dict[coord][base].items(), key = itemgetter(1), reverse = True):
                         output_string += " {}:{:05.3f}".format(aainfo[0], aainfo[1])
                         if (args.P):
                             output_string += ":{:08.6f}".format(pvalsP[coord][base][aainfo[0].upper()])
@@ -692,25 +751,36 @@ def main():
 
     if (args.logo):
         print("Producing logo graphics")
-        #def bplogo_output(bpinfo, height_dict, bp_set, pvals, p, P, sprinzl, d, file_prefix, alpha):
-        bplogo_output(info, height_dict, bp_set, adjusted_pvals[multipletesting[0]], args.p, args.P, sprinzl, args.d, args.file_preifx, args.alpha)
-        #def logo_output(site_info, site_height_dict, pvals = {}, p = False, P = False):
-        pair_to_sprinzl = {}
-        coord_to_pair = {}
-        for arm in ["A", "D", "C", "T"]:
-            for i, coord in enumerate(sprinzl[arm]):
-                if (not i < len(pairs[arm])):
-                    continue
-                pair_to_sprinzl[":".join([str(pairs[arm][i][0] + 1), str(pairs[arm][i][1] + 1)])] = coord
-
-
-        for key in pair_to_sprinzl:
-            key_split = key.split(":")
-            for x in key_split:
-                coord_to_pair[x] = key
-
         if (permute):
-            logo_output(site_info, site_height_dict, adjusted_pvals[multipletesting[0]], args.p, args.P,
-                        pair_to_sprinzl, coord_to_pair, args.file_preifx, args.alpha)
+            bplogo_output(info, height_dict, bp_set, adjusted_pvals[multipletesting[0]], args.p, args.P, sprinzl, args.d, args.file_preifx, args.alpha)
         else:
-            logo_output(site_info, site_height_dict, {}, args.p, args.P, pair_to_sprinzl, coord_to_pair, args.file_preifx)
+            bplogo_output(info, height_dict, bp_set, {}, args.p, args.P, sprinzl, args.d, args.file_preifx, args.alpha)
+
+        if (args.single):
+            #def slogo_output(site_info, site_height_dict, pvals, p, P, file_prefix, alpha):
+            if (permute):
+                slogo_output(site_info, site_height_dict, adjusted_pvals[multipletesting[0]], args.p, args.P,
+                             args.file_preifx, args.alpha)
+            else:
+                slogo_output(site_info, site_height_dict, {}, args.p, args.P,
+                             args.file_preifx, args.alpha)
+
+           # pair_to_sprinzl = {}
+           # coord_to_pair = {}
+           # for arm in ["A", "D", "C", "T"]:
+           #     for i, coord in enumerate(sprinzl[arm]):
+           #         if (not i < len(pairs[arm])):
+           #             continue
+           #         pair_to_sprinzl[":".join([str(pairs[arm][i][0] + 1), str(pairs[arm][i][1] + 1)])] = coord
+
+
+           # for key in pair_to_sprinzl:
+           #     key_split = key.split(":")
+           #     for x in key_split:
+           #         coord_to_pair[x] = key
+
+           # if (permute):
+           #     logo_output(site_info, site_height_dict, adjusted_pvals[multipletesting[0]], args.p, args.P,
+           #             pair_to_sprinzl, coord_to_pair, args.file_preifx, args.alpha)
+           # else:
+           #     logo_output(site_info, site_height_dict, {}, args.p, args.P, pair_to_sprinzl, coord_to_pair, args.file_preifx)
