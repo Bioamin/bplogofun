@@ -1,0 +1,1 @@
+Search.setIndex({envversion:47,filenames:["Installation","Introduction","Tutorial","index"],objects:{},objnames:{},objtypes:{},terms:{content:3,index:[],modul:[],page:[],search:[]},titles:["Installation","Introduction","Tutorial","Welcome to bplogofun&#8217;s documentation!"],titleterms:{bplogofun:3,document:3,indic:[],instal:0,introduct:1,tabl:[],tutori:2,welcom:3}})

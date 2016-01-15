@@ -52,9 +52,7 @@ def rtp(data, point, keys_sorted):
         return 1.0
 
 def approx_expect(H, k, N):
-    es = (k-1)/(2*N)
-    es *= mt.log(mt.exp(1),2)
-    return H - es
+    return H - ((k - 1)/((mt.log(4)) * N)) 
 
 #    sprinzl = {'A': ["1:72", "2:71", "3:70", "4:69", "5:68", "6:67", "7:66"],
 #               'D': ["10:25", "11:24", "12:23", "13:22"],
