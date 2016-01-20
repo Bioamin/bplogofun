@@ -105,27 +105,31 @@ def slogo_output(site_info, site_height_dict, pvals, p, P, file_prefix, alpha):
 
     for base in logo_outputDict:
         logodata = ""
-        for coord in sorted(logo_outputDict[base]):
-            if (len(str(coord)) > coord_length):
-                coord_length = len(str(coord))
-            if (p and base in pvals['p'][coord] and pvals['p'][coord][base] <= alpha):
-                logodata += "numbering {{(*{}) makenumber}} if\ngsave\n".format(coord)
-                coord_length_addition = 1
+        for coord in range(1, len(site_info)+1):
+            if coord in logo_outputDict[base]:
+                if (len(str(coord)) > coord_length):
+                    coord_length = len(str(coord))
+                if (p and base in pvals['p'][coord] and pvals['p'][coord][base] <= alpha):
+                    logodata += "numbering {{(*{}) makenumber}} if\ngsave\n".format(coord)
+                    coord_length_addition = 1
+                else:
+                    logodata += "numbering {{({}) makenumber}} if\ngsave\n".format(coord)
+                
+                for aainfo in sorted(logo_outputDict[base][coord].items(), key = itemgetter(1)):
+                    if (aainfo[1] == 0):
+                        continue
+                    #pvalsP[i][state][aa_class[0]]
+                    if (P and aainfo[0] in pvals['P'][coord][base] and pvals['P'][coord][base][aainfo[0]] <= alpha):
+                        logodata += "/showingbox (s) def\n"
+                        logodata += "{:07.5f} ({}) numchar\n".format(aainfo[1], aainfo[0].upper())
+                        logodata += "/showingbox (n) def\n"
+                    else:
+                        logodata += "{:07.5f} ({}) numchar\n".format(aainfo[1], aainfo[0].upper())
+                
+                logodata += "grestore\nshift\n"
             else:
                 logodata += "numbering {{({}) makenumber}} if\ngsave\n".format(coord)
-            
-            for aainfo in sorted(logo_outputDict[base][coord].items(), key = itemgetter(1)):
-                if (aainfo[1] == 0):
-                    continue
-                #pvalsP[i][state][aa_class[0]]
-                if (P and aainfo[0] in pvals['P'][coord][base] and pvals['P'][coord][base][aainfo[0]] <= alpha):
-                    logodata += "/showingbox (s) def\n"
-                    logodata += "{:07.5f} ({}) numchar\n".format(aainfo[1], aainfo[0].upper())
-                    logodata += "/showingbox (n) def\n"
-                else:
-                    logodata += "{:07.5f} ({}) numchar\n".format(aainfo[1], aainfo[0].upper())
-            
-            logodata += "grestore\nshift\n"
+                logodata += "grestore\nshift\n"
 
         #output logodata to template
         template_byte = pkgutil.get_data('bplogofun', 'eps/Template.eps')
@@ -408,9 +412,10 @@ def main():
         print("Generating permuted alignment data", file=sys.stderr)
         for p in range(num_permutations):
             indices.append(permuted(range(len(aa_classes))))
-            print("{} of {} permutation indices generated".format((p+1), num_permutations), end="\r")
+            print("{} of {} permutation indices generated".format((p+1), num_permutations), end="\r",
+                  file=sys.stderr)
         seq_len = len(seqs)
-        print()
+        print("", file=sys.stderr)
         for s, seq in enumerate(seqs):
             for arm in pairs:
                 for j, coords in enumerate(pairs[arm]):
@@ -426,8 +431,9 @@ def main():
                     for p in range(num_permutations):
                         psitefreq[p][pos+1][state][aa_classes[indices[p][s]]] += 1
             
-            print("{:05.2f}% of permutations completed".format(((s+1)/ seq_len) * 100), end='\r')
-        print()
+            print("{:05.2f}% of permutations completed".format(((s+1)/ seq_len) * 100), end='\r',
+                  file=sys.stderr)
+        print("", file=sys.stderr)
             
     print("Computing exact expected entropies", file = sys.stderr)
     
@@ -748,7 +754,7 @@ def main():
                     print(output_string)
 
     if (args.logo):
-        print("Producing logo graphics")
+        print("Producing logo graphics", file = sys.stderr)
         if (permute):
             bplogo_output(info, height_dict, bp_set, adjusted_pvals[multipletesting[0]], args.p, args.P, sprinzl, args.d, args.file_preifx, args.alpha)
         else:
