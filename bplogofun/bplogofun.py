@@ -1,7 +1,5 @@
 # -*- coding: utf-8 -*-
 
-from __future__ import print_function
-from __future__ import division
 from collections import defaultdict
 from operator import itemgetter
 from string import Template
@@ -74,7 +72,7 @@ def bplogo_output(bpinfo, height_dict, bp_set, pvals, p, P, sprinzl, d, file_pre
                     else:
                         logodata += "numbering {{({}) makenumber}} if\ngsave\n".format(coord)
                     for aainfo in sorted(height_dict[coord][bp].items(), key = itemgetter(1)):
-                        if (bpinfo[coord][bp] * aainfo[1] <= 0):
+                        if (bpinfo[coord][bp] * aainfo[1] <= 0 or math.isnan(bpinfo[coord][bp] * aainfo[1])):
                             continue
                         else:
                             #pvalsP[bp][pairtype][aa_class[0]] = pv
@@ -116,7 +114,7 @@ def slogo_output(site_info, site_height_dict, pvals, p, P, file_prefix, alpha):
                     logodata += "numbering {{({}) makenumber}} if\ngsave\n".format(coord)
                 
                 for aainfo in sorted(logo_outputDict[base][coord].items(), key = itemgetter(1)):
-                    if (aainfo[1] == 0):
+                    if (aainfo[1] <= 0 or math.isnan(aainfo[1])):
                         continue
                     #pvalsP[i][state][aa_class[0]]
                     if (P and aainfo[0] in pvals['P'][coord][base] and pvals['P'][coord][base][aainfo[0]] <= alpha):
@@ -161,7 +159,7 @@ def logo_output(site_info, site_height_dict, pvals, p, P, pair_to_sprinzl,
             else:
                 logodata += "numbering {{({}) makenumber}} if\ngsave\n".format(coord)
             for aainfo in sorted(logo_outputDict[base][coord].iteritems(), key = itemgetter(1)):
-                if (aainfo[1] == 0):
+                if (aainfo[1] == 0 or math.isnan(aainfo[1])):
                     continue
                 if P:
                     #pvalsP[bp][pairtype][aa_class[0]] = pv
