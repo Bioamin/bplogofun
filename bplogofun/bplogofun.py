@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-
 from collections import defaultdict
 from operator import itemgetter
 from string import Template
 from copy import deepcopy
 from array import array
+from multiprocessing import Pool
 import argparse
 import re
 import sys
@@ -16,6 +16,13 @@ import statsmodels.api
 import time
 import pkgutil
 import bisect
+import numpy as np
+import bplogofun.nsb_entropy as nsb
+
+def exact_run(n, p, numclasses):
+    j = bplogofun.exact.calc_exact(n, p, numclasses)
+    print("{:2} {:07.5f}".format(n, j[1]), file=sys.stderr)
+    return j
 
 def permuted(items, pieces = 2):
     sublists = [[] for i in range(pieces)]
@@ -51,6 +58,10 @@ def rtp(data, point, keys_sorted):
 
 def approx_expect(H, k, N):
     return H - ((k - 1)/((mt.log(4)) * N)) 
+
+def nsb_test(sample, k):
+    sample = np.array(list(sample))
+    return float(nsb.dS(nsb.make_nxkx(sample, k), sample.sum(), k))
 
 #    sprinzl = {'A': ["1:72", "2:71", "3:70", "4:69", "5:68", "6:67", "7:66"],
 #               'D': ["10:25", "11:24", "12:23", "13:22"],
@@ -439,11 +450,18 @@ def main():
     exact_list = []
     start_sample_sz =1
     for n in range(start_sample_sz, args.max + 1):
-        j = bplogofun.exact.calc_exact(n, p, numclasses)
-        exact_list.append(j[1])
-        print("{:2} {:07.5f}".format(n, exact_list[n-1]), file=sys.stderr)
+        exact_list.append((n, p, numclasses))
+        #j = bplogofun.exact.calc_exact(n, p, numclasses)
+        #exact_list.append(j[1])
+        #print("{:2} {:07.5f}".format(n, exact_list[n-1]), file=sys.stderr)
     
-    
+    with Pool(processes=7) as pool:
+        test = pool.starmap(exact_run, exact_list)
+
+    exact_list = []
+    for x in test:
+        exact_list.append(x[1])
+
     bg_entropy = 0
     info = defaultdict(lambda : defaultdict(float))
     height_dict = defaultdict(lambda : defaultdict(lambda : defaultdict(float)))
@@ -558,6 +576,7 @@ def main():
                 if ((expected_bg_entropy - fg_entropy) < 0):
                     info[bp][pairtype] = 0
                 else:
+                        
                     info[bp][pairtype] = expected_bg_entropy - fg_entropy
                 
                 if (args.p):
