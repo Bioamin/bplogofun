@@ -3,7 +3,6 @@ from collections import defaultdict
 from operator import itemgetter
 from string import Template
 from copy import deepcopy
-from array import array
 from multiprocessing import Pool
 import argparse
 import re
@@ -11,13 +10,12 @@ import sys
 import glob
 import math as mt
 import bplogofun.exact
+import nsb.estimate
 import random
 import statsmodels.api
 import time
 import pkgutil
 import bisect
-import numpy as np
-import bplogofun.nsb_entropy as nsb
 
 def exact_run(n, p, numclasses):
     j = bplogofun.exact.calc_exact(n, p, numclasses)
@@ -58,10 +56,6 @@ def rtp(data, point, keys_sorted):
 
 def approx_expect(H, k, N):
     return H - ((k - 1)/((mt.log(4)) * N)) 
-
-def nsb_test(sample, k):
-    sample = np.array(list(sample))
-    return float(nsb.dS(nsb.make_nxkx(sample, k), sample.sum(), k))
 
 #    sprinzl = {'A': ["1:72", "2:71", "3:70", "4:69", "5:68", "6:67", "7:66"],
 #               'D': ["10:25", "11:24", "12:23", "13:22"],
@@ -451,9 +445,6 @@ def main():
     start_sample_sz =1
     for n in range(start_sample_sz, args.max + 1):
         exact_list.append((n, p, numclasses))
-        #j = bplogofun.exact.calc_exact(n, p, numclasses)
-        #exact_list.append(j[1])
-        #print("{:2} {:07.5f}".format(n, exact_list[n-1]), file=sys.stderr)
     
     with Pool(processes=7) as pool:
         test = pool.starmap(exact_run, exact_list)
@@ -614,6 +605,18 @@ def main():
                     site_info[i][state] = 0.0
                 else:
                     site_info[i][state] = expected_bg_entropy - fg_entropy
+                    if (total == 14 or total == 15 or total == 13):
+                        nsb_list = list(sitefreq[i][state].values())
+                        nsb_list.extend([0]*(numclasses-numpositives))
+                        print("numpositives:{}".format(numpositives))
+                        print("entropy list:{} nsb_list:{}".format(sitefreq[i][state], nsb_list))
+                        print("nsb_list length: {}".format(len(nsb_list)))
+                        print("Total: {}".format(total))
+                        print("fg_entropy: {} nsb: {} background: {} corrected bg: {}".format(fg_entropy, nsb.estimate.nsb_entropy(nsb_list, numclasses), bg_entropy, approx_expect(bg_entropy, numclasses, total)))
+                        print("exact:{} current:{} nsb:{}".format(expected_bg_entropy - fg_entropy,
+                                                                    approx_expect(bg_entropy, numclasses, total) - fg_entropy,
+                                                                    bg_entropy - nsb.estimate.nsb_entropy(nsb_list, numclasses)))
+                        print()
 
                 if (args.p):
                     pv = rtp(siteinfodist, site_info[i][state], siteinfodist_sortedKeys)
