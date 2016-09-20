@@ -10,7 +10,7 @@ import sys
 import glob
 import math as mt
 import bplogofun.exact
-import nsb.estimate
+import bplogofun.nsb_entropy as nb
 import random
 import statsmodels.api
 import time
@@ -605,18 +605,6 @@ def main():
                     site_info[i][state] = 0.0
                 else:
                     site_info[i][state] = expected_bg_entropy - fg_entropy
-                    if (total == 14 or total == 15 or total == 13):
-                        nsb_list = list(sitefreq[i][state].values())
-                        nsb_list.extend([0]*(numclasses-numpositives))
-                        print("numpositives:{}".format(numpositives))
-                        print("entropy list:{} nsb_list:{}".format(sitefreq[i][state], nsb_list))
-                        print("nsb_list length: {}".format(len(nsb_list)))
-                        print("Total: {}".format(total))
-                        print("fg_entropy: {} nsb: {} background: {} corrected bg: {}".format(fg_entropy, nsb.estimate.nsb_entropy(nsb_list, numclasses), bg_entropy, approx_expect(bg_entropy, numclasses, total)))
-                        print("exact:{} current:{} nsb:{}".format(expected_bg_entropy - fg_entropy,
-                                                                    approx_expect(bg_entropy, numclasses, total) - fg_entropy,
-                                                                    bg_entropy - nsb.estimate.nsb_entropy(nsb_list, numclasses)))
-                        print()
 
                 if (args.p):
                     pv = rtp(siteinfodist, site_info[i][state], siteinfodist_sortedKeys)
