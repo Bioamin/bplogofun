@@ -1,4 +1,5 @@
 from mpmath import psi, rf, power, quadgl, mp
+import math as mt
 import numpy as np
 
 DPS = 20
@@ -69,7 +70,7 @@ def S(nxkx, N, K):
   
     f = lambda w: _Si(w, nxkx, N, K)
     g = lambda w: _measure(w, nxkx, N, K)  
-    return quadgl(f, [0.0, 1.0])/quadgl(g, [0.0, 1.0])
+    return float((quadgl(f, [0.0, 1.0])/quadgl(g, [0.0, 1.0]))/mt.log(2))
 
 def _S2i_diag(x, nxkx, beta, N, kappa):
     xbeta = x+beta

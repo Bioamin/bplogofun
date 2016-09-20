@@ -11,6 +11,7 @@ import glob
 import math as mt
 import bplogofun.exact
 import bplogofun.nsb_entropy as nb
+import numpy as np
 import random
 import statsmodels.api
 import time
@@ -473,12 +474,17 @@ def main():
                     for p in range(num_permutations):
                         numpositives = len(pfreq[p][bp][pairtype])
                         fg_entropy = 0
+                        #nsb_list = list(pfreq[p][bp][pairtype].values()) + [0]*(numclasses-numpositives)
+                        #nsb_array = np.array(nsb_list)
+                        #fg_entropy1 = nb.S(nb.make_nxkx(nsb_array,nsb_array.size), nsb_array.sum(), nsb_array.size)
+                        #print("rep {} nsb: {}".format(p,fg_entropy1))
                         for x in pfreq[p][bp][pairtype].values():
                             fg_entropy -= (x/total)*mt.log(x/total,2)
                         if (total <= args.max):
                             expected_bg_entropy = exact_list[total - 1]
                         else:
                             expected_bg_entropy = approx_expect(bg_entropy, numclasses, total)
+                            
 
                         if ((expected_bg_entropy - fg_entropy) < 0):
                             info_int = 0.0
@@ -557,6 +563,14 @@ def main():
                 total = summ[bp][pairtype]
                 numpositives = len(freq[bp][pairtype])
                 fg_entropy = 0
+                #nsb_list = list(freq[bp][pairtype].values()) + [0]*(numclasses-numpositives)
+                #nsb_array = np.array(nsb_list)
+                #fg_entropy = nb.S(nb.make_nxkx(nsb_array,nsb_array.size), nsb_array.sum(), nsb_array.size)
+                #if ((bg_entropy - fg_entropy) < 0):
+                #    info[bp][pairtype] = 0
+                #else:
+                #    info[bp][pairtype] = bg_entropy - fg_entropy
+                
                 for x in freq[bp][pairtype].values():
                     fg_entropy -= (x/total) * mt.log(x/total, 2)
                 if (total <= args.max):
@@ -567,7 +581,6 @@ def main():
                 if ((expected_bg_entropy - fg_entropy) < 0):
                     info[bp][pairtype] = 0
                 else:
-                        
                     info[bp][pairtype] = expected_bg_entropy - fg_entropy
                 
                 if (args.p):
@@ -596,6 +609,13 @@ def main():
                 total = sitesum[i][state]
                 numpositives = len(sitefreq[i][state])
                 fg_entropy = 0
+                #nsb_list = list(sitefreq[i][state].values()) + [0]*(numclasses-numpositives)
+                #nsb_array = np.array(nsb_list)
+                #fg_entropy = nb.S(nb.make_nxkx(nsb_array,nsb_array.size), nsb_array.sum(), nsb_array.size)
+                #if ((bg_entropy - fg_entropy) < 0):
+                #    site_info[i][state] = 0
+                #else:
+                #    site_info[i][state] = bg_entropy - fg_entropy
                 fg_entropy = -(sum(map(lambda x: (x/total) * mt.log(x/total,2), sitefreq[i][state].values())))
                 if (total <= args.max):
                     expected_bg_entropy = exact_list[total-1]
