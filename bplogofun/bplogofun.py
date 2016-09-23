@@ -18,10 +18,10 @@ import time
 import pkgutil
 import bisect
 
-def exact_run(n, p, numclasses):
-    j = bplogofun.exact.calc_exact(n, p, numclasses)
-    print("{:2} {:07.5f}".format(n, j[1]), file=sys.stderr)
-    return j
+#def exact_run(n, p, numclasses):
+#    j = bplogofun.exact.calc_exact(n, p, numclasses)
+#    print("{:2} {:07.5f}".format(n, j[1]), file=sys.stderr)
+#    return j
 
 def permuted(items, pieces = 2):
     sublists = [[] for i in range(pieces)]
@@ -55,8 +55,8 @@ def rtp(data, point, keys_sorted):
     else:
         return 1.0
 
-def approx_expect(H, k, N):
-    return H - ((k - 1)/((mt.log(4)) * N)) 
+#def approx_expect(H, k, N):
+#    return H - ((k - 1)/((mt.log(4)) * N)) 
 
 #    sprinzl = {'A': ["1:72", "2:71", "3:70", "4:69", "5:68", "6:67", "7:66"],
 #               'D': ["10:25", "11:24", "12:23", "13:22"],
@@ -439,20 +439,20 @@ def main():
                   file=sys.stderr)
         print("", file=sys.stderr)
             
-    print("Computing exact expected entropies", file = sys.stderr)
-    
-    p = [x/sum(size_dict.values()) for x in size_dict.values()] # Holds Background
-    exact_list = []
-    start_sample_sz =1
-    for n in range(start_sample_sz, args.max + 1):
-        exact_list.append((n, p, numclasses))
-    
-    with Pool(processes=7) as pool:
-        test = pool.starmap(exact_run, exact_list)
+    #print("Computing exact expected entropies", file = sys.stderr)
+    #
+    #p = [x/sum(size_dict.values()) for x in size_dict.values()] # Holds Background
+    #exact_list = []
+    #start_sample_sz =1
+    #for n in range(start_sample_sz, args.max + 1):
+    #    exact_list.append((n, p, numclasses))
+    #
+    #with Pool(processes=7) as pool:
+    #    test = pool.starmap(exact_run, exact_list)
 
-    exact_list = []
-    for x in test:
-        exact_list.append(x[1])
+    #exact_list = []
+    #for x in test:
+    #    exact_list.append(x[1])
 
     bg_entropy = 0
     info = defaultdict(lambda : defaultdict(float))
@@ -563,25 +563,25 @@ def main():
                 total = summ[bp][pairtype]
                 numpositives = len(freq[bp][pairtype])
                 fg_entropy = 0
-                #nsb_list = list(freq[bp][pairtype].values()) + [0]*(numclasses-numpositives)
-                #nsb_array = np.array(nsb_list)
-                #fg_entropy = nb.S(nb.make_nxkx(nsb_array,nsb_array.size), nsb_array.sum(), nsb_array.size)
-                #if ((bg_entropy - fg_entropy) < 0):
-                #    info[bp][pairtype] = 0
-                #else:
-                #    info[bp][pairtype] = bg_entropy - fg_entropy
-                
-                for x in freq[bp][pairtype].values():
-                    fg_entropy -= (x/total) * mt.log(x/total, 2)
-                if (total <= args.max):
-                    expected_bg_entropy = exact_list[total - 1]
-                else:
-                    expected_bg_entropy = approx_expect(bg_entropy, numclasses, total)
-                
-                if ((expected_bg_entropy - fg_entropy) < 0):
+                nsb_list = list(freq[bp][pairtype].values()) + [0]*(numclasses-numpositives)
+                nsb_array = np.array(nsb_list)
+                fg_entropy = nb.S(nb.make_nxkx(nsb_array,nsb_array.size), nsb_array.sum(), nsb_array.size)
+                if ((bg_entropy - fg_entropy) < 0):
                     info[bp][pairtype] = 0
                 else:
-                    info[bp][pairtype] = expected_bg_entropy - fg_entropy
+                    info[bp][pairtype] = bg_entropy - fg_entropy
+                
+                #for x in freq[bp][pairtype].values():
+                #    fg_entropy -= (x/total) * mt.log(x/total, 2)
+                #if (total <= args.max):
+                #    expected_bg_entropy = exact_list[total - 1]
+                #else:
+                #    expected_bg_entropy = approx_expect(bg_entropy, numclasses, total)
+                #
+                #if ((expected_bg_entropy - fg_entropy) < 0):
+                #    info[bp][pairtype] = 0
+                #else:
+                #    info[bp][pairtype] = expected_bg_entropy - fg_entropy
                 
                 if (args.p):
                     pv = rtp(bpinfodist, info[bp][pairtype], bpinfodist_sortedKeys)
@@ -609,22 +609,22 @@ def main():
                 total = sitesum[i][state]
                 numpositives = len(sitefreq[i][state])
                 fg_entropy = 0
-                #nsb_list = list(sitefreq[i][state].values()) + [0]*(numclasses-numpositives)
-                #nsb_array = np.array(nsb_list)
-                #fg_entropy = nb.S(nb.make_nxkx(nsb_array,nsb_array.size), nsb_array.sum(), nsb_array.size)
-                #if ((bg_entropy - fg_entropy) < 0):
-                #    site_info[i][state] = 0
+                nsb_list = list(sitefreq[i][state].values()) + [0]*(numclasses-numpositives)
+                nsb_array = np.array(nsb_list)
+                fg_entropy = nb.S(nb.make_nxkx(nsb_array,nsb_array.size), nsb_array.sum(), nsb_array.size)
+                if ((bg_entropy - fg_entropy) < 0):
+                    site_info[i][state] = 0
+                else:
+                    site_info[i][state] = bg_entropy - fg_entropy
+                #fg_entropy = -(sum(map(lambda x: (x/total) * mt.log(x/total,2), sitefreq[i][state].values())))
+                #if (total <= args.max):
+                #    expected_bg_entropy = exact_list[total-1]
                 #else:
-                #    site_info[i][state] = bg_entropy - fg_entropy
-                fg_entropy = -(sum(map(lambda x: (x/total) * mt.log(x/total,2), sitefreq[i][state].values())))
-                if (total <= args.max):
-                    expected_bg_entropy = exact_list[total-1]
-                else:
-                    expected_bg_entropy = approx_expect(bg_entropy, numclasses, total)
-                if ((expected_bg_entropy - fg_entropy) < 0):
-                    site_info[i][state] = 0.0
-                else:
-                    site_info[i][state] = expected_bg_entropy - fg_entropy
+                #    expected_bg_entropy = approx_expect(bg_entropy, numclasses, total)
+                #if ((expected_bg_entropy - fg_entropy) < 0):
+                #    site_info[i][state] = 0.0
+                #else:
+                #    site_info[i][state] = expected_bg_entropy - fg_entropy
 
                 if (args.p):
                     pv = rtp(siteinfodist, site_info[i][state], siteinfodist_sortedKeys)
