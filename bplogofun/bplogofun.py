@@ -474,22 +474,24 @@ def main():
                     for p in range(num_permutations):
                         numpositives = len(pfreq[p][bp][pairtype])
                         fg_entropy = 0
-                        #nsb_list = list(pfreq[p][bp][pairtype].values()) + [0]*(numclasses-numpositives)
-                        #nsb_array = np.array(nsb_list)
-                        #fg_entropy1 = nb.S(nb.make_nxkx(nsb_array,nsb_array.size), nsb_array.sum(), nsb_array.size)
-                        #print("rep {} nsb: {}".format(p,fg_entropy1))
-                        for x in pfreq[p][bp][pairtype].values():
-                            fg_entropy -= (x/total)*mt.log(x/total,2)
-                        if (total <= args.max):
-                            expected_bg_entropy = exact_list[total - 1]
-                        else:
-                            expected_bg_entropy = approx_expect(bg_entropy, numclasses, total)
+                        nsb_list = list(pfreq[p][bp][pairtype].values()) + [0]*(numclasses-numpositives)
+                        nsb_array = np.array(nsb_list)
+                        fg_entropy = nb.S(nb.make_nxkx(nsb_array,nsb_array.size), nsb_array.sum(), nsb_array.size)
+                        #for x in pfreq[p][bp][pairtype].values():
+                        #    fg_entropy -= (x/total)*mt.log(x/total,2)
+                        #if (total <= args.max):
+                        #    expected_bg_entropy = exact_list[total - 1]
+                        #else:
+                        #    expected_bg_entropy = approx_expect(bg_entropy, numclasses, total)
                             
-
-                        if ((expected_bg_entropy - fg_entropy) < 0):
+                        if ((bg_entropy - fg_entropy) < 0):
                             info_int = 0.0
                         else:
-                            info_int = expected_bg_entropy - fg_entropy
+                            info_int = bg_entropy - fg_entropy
+                        #if ((expected_bg_entropy - fg_entropy) < 0):
+                        #    info_int = 0.0
+                        #else:
+                        #    info_int = expected_bg_entropy - fg_entropy
                         
                         if (args.p):
                             bpinfodata.append(info_int)
@@ -522,17 +524,24 @@ def main():
                     for p in range(num_permutations):
                         numpositives = len(psitefreq[p][i][state])
                         fg_entropy = 0
-                        for x in psitefreq[p][i][state].values():
-                            fg_entropy -= x/total * mt.log(x/total, 2)
-                        if (total <= args.max):
-                            expected_bg_entropy = exact_list[total - 1]
-                        else:
-                            expected_bg_entropy = approx_expect(bg_entropy, numclasses, total)
+                        nsb_list = list(psitefreq[p][i][state].values()) + [0]*(numclasses-numpositives)
+                        nsb_array = np.array(nsb_list)
+                        fg_entropy = nb.S(nb.make_nxkx(nsb_array,nsb_array.size), nsb_array.sum(), nsb_array.size)
+                        #for x in psitefreq[p][i][state].values():
+                        #    fg_entropy -= x/total * mt.log(x/total, 2)
+                        #if (total <= args.max):
+                        #    expected_bg_entropy = exact_list[total - 1]
+                        #else:
+                        #    expected_bg_entropy = approx_expect(bg_entropy, numclasses, total)
                         
-                        if ((expected_bg_entropy - fg_entropy) < 0):
-                            info_int = 0
+                        #if ((expected_bg_entropy - fg_entropy) < 0):
+                        #    info_int = 0
+                        #else:
+                        #    info_int = expected_bg_entropy - fg_entropy
+                        if ((bg_entropy - fg_entropy) < 0):
+                            info_int = 0.0
                         else:
-                            info_int = expected_bg_entropy - fg_entropy
+                            info_int = bg_entropy - fg_entropy
 
                         if (args.p):
                             siteinfodata.append(info_int)
@@ -796,23 +805,3 @@ def main():
             else:
                 slogo_output(site_info, site_height_dict, {}, args.p, args.P,
                              args.file_preifx, args.alpha)
-
-           # pair_to_sprinzl = {}
-           # coord_to_pair = {}
-           # for arm in ["A", "D", "C", "T"]:
-           #     for i, coord in enumerate(sprinzl[arm]):
-           #         if (not i < len(pairs[arm])):
-           #             continue
-           #         pair_to_sprinzl[":".join([str(pairs[arm][i][0] + 1), str(pairs[arm][i][1] + 1)])] = coord
-
-
-           # for key in pair_to_sprinzl:
-           #     key_split = key.split(":")
-           #     for x in key_split:
-           #         coord_to_pair[x] = key
-
-           # if (permute):
-           #     logo_output(site_info, site_height_dict, adjusted_pvals[multipletesting[0]], args.p, args.P,
-           #             pair_to_sprinzl, coord_to_pair, args.file_preifx, args.alpha)
-           # else:
-           #     logo_output(site_info, site_height_dict, {}, args.p, args.P, pair_to_sprinzl, coord_to_pair, args.file_preifx)
