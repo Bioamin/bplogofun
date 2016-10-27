@@ -361,21 +361,23 @@ def main():
         size_dict[aa_class] = 0
         with open(fn, "r") as ALN:
             good = False
+            begin_seq = False
             interleaved = False
             seq = {}
             for line in ALN:
-                line = line.strip()
+                #line = line.strip()
                 match = re.search("^(\S+)\s+(\S+)", line)
                 if (re.search("^CLUSTAL", line)):
                     good = True
                     continue
-                elif (re.search("^[\s\*\:\.]+$", line) and not interleaved):
-                    #print("Alignment data appears to be interleaved.", file = sys.stderr)
+                elif (re.search("^[\s\*\.\:]+$", line) and not interleaved and begin_seq):
+                    print("Alignment data appears to be interleaved.", file = sys.stderr)
                     interleaved = True
-                elif (re.search("^[\s\*\:\.]+$", line) and interleaved):
+                elif (re.search("^[\s\*\.\:]+$", line) and interleaved and begin_seq):
                     continue
                 
                 elif (match and not interleaved):
+                    begin_seq = True
                     if (not good):
                         sys.exit("File {} appears not to be a clustal file".format(fn))
                     seq[match.group(1)] = match.group(2)
